@@ -1,6 +1,16 @@
 # Turtle Typers
 
-Multiplayer typing race: players join from their phones, type a shared prompt as fast and accurately as they can, and watch “turtles” move on a shared display. Built with **Node.js**, **Express**, **WebSockets** (`ws`), and **Vue 3** (loaded from a CDN in the browser).
+## About this project
+
+**Turtle Typers** is a multiplayer typing race. One screen acts as the “board”: it shows the lobby, a live race where each player’s turtle moves based on typing progress, and a podium for the top finishers. Players use their own devices (often phones) to join, enter a name, and type the same prompt as quickly and accurately as they can. Better typing moves your turtle forward; everyone sees the race unfold together in real time.
+
+The app is a small full-stack demo: a **Node.js** server with **Express** serves the UI and hosts a **WebSocket** server (`ws`) so the display and all player clients stay synchronized. The front end uses **Vue 3** from a CDN. It works well for classrooms, parties, or any setting where you want a shared big screen plus personal keyboards.
+
+## Screenshot
+
+Player join screen (teal lobby, **Turtle Typers** title, scan-to-join QR, and name field):
+
+![Turtle Typers player lobby with QR code and join field](docs/player-lobby.png)
 
 ## How it works
 
