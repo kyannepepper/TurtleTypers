@@ -32,6 +32,8 @@ const app = Vue.createApp({
             stop: 0,
             stopText: "",
             numOfFalse: 0,
+            lastTyped: "",
+            hasFinished: false,
             showFirstPlace: false,
             showSecondPlace: false,
             showThirdPlace: false,
@@ -88,6 +90,8 @@ const app = Vue.createApp({
                 this.stop = 0;
                 this.stopText = "";
                 this.numOfFalse = 0;
+                this.lastTyped = "";
+                this.hasFinished = false;
                 this.typingPrompt = "";
                 this.typingPromptText = "";
                 this.whatYouAreTyping = "";
@@ -274,7 +278,7 @@ const app = Vue.createApp({
                 console.log("You Finished")
                 let toSend = {
                     action: 'finished',
-                    accuracy: Math.ceil(((this.typingPromptText.length - this.numOfFalse) / this.typingPromptText.length) * 100),
+                    accuracy: Math.max(0, Math.round(((this.typingPromptText.length - this.numOfFalse) / this.typingPromptText.length) * 100)),
                     time: this.time,
                     wpm: this.calculateWordsPerMinute(),
                 }
@@ -283,7 +287,7 @@ const app = Vue.createApp({
                 let toSend = {
                     action: 'sendPercentage',
                     percentage: percentage,
-                    accuracy: Math.ceil(((this.typingPromptText.length - this.numOfFalse) / this.typingPromptText.length) * 100),
+                    accuracy: Math.max(0, Math.round(((this.typingPromptText.length - this.numOfFalse) / this.typingPromptText.length) * 100)),
                 }
                 this.sendToSocket(toSend);
             }
@@ -325,62 +329,58 @@ const app = Vue.createApp({
         },
         
         handleInput(event) {
-            // console.log(event)
-            // this.userTyped += event.key or somethjing like that
-            // This function will be called every time the input value changes
-            console.log('Input event:', event.target.value);
-            let length = this.whatYouAreTyping.length;
-            let isFinished = false;
-            
-            
-            if (this.stop == 0 || event.target.value == this.stopText.slice(0, -1)) {
-                if (event.target.value == this.stopText.slice(0, -1)) {
-                    this.stop = 0
-                }
-                for (let i = 0; i < length; i++) {
-                    if (this.whatYouAreTyping[i] != this.typingPromptText[i]) {
-                        this.stop = this.whatYouAreTyping.length
-                        this.stopText = this.whatYouAreTyping
-                        console.log("False: ", this.whatYouAreTyping[i], " != ", this.typingPromptText[i]);
-                        // this.typingPrompt = this.typingPrompt.substring(0, i) + "<span style='color: red'>" + this.typingPrompt[i] + "</span>" + this.typingPrompt.substring(i + 1);
-                        console.log("Typing Prompt: ", this.typingPrompt);
-                        console.log("This.typingprompt.supstring: ", this.typingPrompt.substring(i + 1));
-                        this.numOfFalse += 1;
-                        correct = false;
-                    } 
-                    if (this.whatYouAreTyping.length == this.typingPromptText.length) {
-                        console.log("You Finished")
-                        isFinished = true;
-                    } if ( this.whatYouAreTyping.length > this.typingPromptText.length ) {
-                        this.whatYouAreTyping = this.typingPromptText;
-                        console.log("You Typed Too Much");
-                    }
-                }
-                let html = '';
-                for (let i = 0; i < this.typingPromptText.length; i++) {
-                    const correctChar = this.typingPromptText[i];
-                    const typedChar = this.whatYouAreTyping[i];
-    
-                    if (typedChar == null) {
-                    // Not yet typed
-                    html += `<span>${correctChar}</span>`;
-                    } else if (typedChar === correctChar) {
-                    html += `<span style="color: white">${correctChar}</span>`;
-                    } else {
-                    html += `<span style="color: #c81515;">${correctChar}</span>`;
-                    }
-                }
-    
-                this.typingPrompt = html;
-            
-                this.sendPercentage(Math.ceil((this.whatYouAreTyping.length / this.typingPromptText.length) * 100));
-            } else {
-                this.whatYouAreTyping = this.stopText;;
-                console.log(this.whatYouAreTyping)
-                console.log(this.stopText.slice(0, -1))
-                
+            // Lets you keep typing after a mistake. Wrong letters are highlighted
+            // in red, and you can backspace to fix them. You only finish once
+            // everything you typed matches the prompt exactly.
+            const target = this.typingPromptText;
+            let typed = this.whatYouAreTyping;
+
+            // Don't let them type past the end of the prompt
+            if (typed.length > target.length) {
+                typed = typed.slice(0, target.length);
+                this.whatYouAreTyping = typed;
             }
-            
+
+            // Count each newly typed wrong letter (for accuracy)
+            if (typed.length > this.lastTyped.length) {
+                for (let i = this.lastTyped.length; i < typed.length; i++) {
+                    if (typed[i] !== target[i]) {
+                        this.numOfFalse += 1;
+                    }
+                }
+            }
+            this.lastTyped = typed;
+
+            // How far they've gotten with no mistakes (this moves the turtle)
+            let correctSoFar = 0;
+            while (correctSoFar < typed.length && typed[correctSoFar] === target[correctSoFar]) {
+                correctSoFar++;
+            }
+
+            // Color the prompt: white = correct, red = wrong, plain = not typed yet
+            const escape = c => c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c;
+            let html = '';
+            for (let i = 0; i < target.length; i++) {
+                const correctChar = escape(target[i]);
+                if (i >= typed.length) {
+                    html += `<span>${correctChar}</span>`;
+                } else if (typed[i] === target[i]) {
+                    html += `<span style="color: white">${correctChar}</span>`;
+                } else {
+                    html += `<span style="color: white; background-color: #c81515; border-radius: 4px;">${correctChar}</span>`;
+                }
+            }
+            this.typingPrompt = html;
+
+            if (typed === target) {
+                if (!this.hasFinished) {
+                    this.hasFinished = true;
+                    this.sendPercentage(100);
+                }
+            } else {
+                // Never report 100% until the whole prompt is typed correctly
+                this.sendPercentage(Math.min(99, Math.floor((correctSoFar / target.length) * 100)));
+            }
         },
         refocus() {
             this.$nextTick(() => {
