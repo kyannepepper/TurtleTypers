@@ -56,11 +56,13 @@
         <input
           v-if="gameBoard === 'typing'"
           ref="hiddenInput"
-          v-model="whatYouAreTyping"
+          :value="whatYouAreTyping"
           @blur="refocus"
           @keydown.tab.prevent
           spellcheck="false"
           autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
           @input="handleInput"
         />
         <h1 v-html="typingPrompt"></h1>
@@ -88,7 +90,7 @@
         </h1>
       </div>
       <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-      <script src="app.js"></script>
+      <script src="app.js?v=3"></script>
     </div>
   </body>
 </html>

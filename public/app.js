@@ -347,13 +347,15 @@ const app = Vue.createApp({
             // in red, and you can backspace to fix them. You only finish once
             // everything you typed matches the prompt exactly.
             const target = this.typingPromptText;
-            let typed = this.whatYouAreTyping;
+            // Read straight from the text box (works with phone keyboards too)
+            let typed = event.target.value;
 
             // Don't let them type past the end of the prompt
             if (typed.length > target.length) {
                 typed = typed.slice(0, target.length);
-                this.whatYouAreTyping = typed;
+                event.target.value = typed;
             }
+            this.whatYouAreTyping = typed;
 
             // Count each newly typed wrong letter (for accuracy)
             if (typed.length > this.lastTyped.length) {

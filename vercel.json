@@ -4,5 +4,11 @@
   "installCommand": "",
   "buildCommand": "",
   "outputDirectory": "public",
-  "rewrites": [{ "source": "/join", "destination": "/player.html" }]
+  "rewrites": [{ "source": "/join", "destination": "/player.html" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    }
+  ]
 }
