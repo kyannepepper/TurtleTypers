@@ -344,8 +344,8 @@ const app = Vue.createApp({
         
         handleInput(event) {
             // Lets you keep typing after a mistake. Wrong letters are highlighted
-            // in red, and you can backspace to fix them. You only finish once
-            // everything you typed matches the prompt exactly.
+            // in red, and you can backspace to fix them. You finish as soon as you
+            // type the last letter, even if there are mistakes (they lower accuracy).
             const target = this.typingPromptText;
             // Read straight from the text box (works with phone keyboards too)
             let typed = event.target.value;
@@ -367,12 +367,6 @@ const app = Vue.createApp({
             }
             this.lastTyped = typed;
 
-            // How far they've gotten with no mistakes (this moves the turtle)
-            let correctSoFar = 0;
-            while (correctSoFar < typed.length && typed[correctSoFar] === target[correctSoFar]) {
-                correctSoFar++;
-            }
-
             // Color the prompt: white = correct, red = wrong, plain = not typed yet
             const escape = c => c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c;
             let html = '';
@@ -388,14 +382,15 @@ const app = Vue.createApp({
             }
             this.typingPrompt = html;
 
-            if (typed === target) {
+            if (typed.length >= target.length) {
+                // Typed the last letter: the race is over for this player
                 if (!this.hasFinished) {
                     this.hasFinished = true;
                     this.sendPercentage(100);
                 }
-            } else {
-                // Never report 100% until the whole prompt is typed correctly
-                this.sendPercentage(Math.min(99, Math.floor((correctSoFar / target.length) * 100)));
+            } else if (!this.hasFinished) {
+                // The turtle moves with how much of the prompt has been typed
+                this.sendPercentage(Math.min(99, Math.floor((typed.length / target.length) * 100)));
             }
         },
         refocus() {
