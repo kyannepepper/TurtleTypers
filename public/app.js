@@ -39,6 +39,9 @@ const app = Vue.createApp({
             showSecondPlace: false,
             showThirdPlace: false,
             topThree: [],
+            resultsHeadline: "",
+            revealTimers: [],
+            confetti: [],
             joinSound: new Audio("/sounds/join.mp3"),
             countDownSound: new Audio("/sounds/countDown.mp3"),
             typeSound: new Audio("/sounds/playing.mp3"),
@@ -93,6 +96,10 @@ const app = Vue.createApp({
                 this.showFirstPlace = false;
                 this.showSecondPlace = false;
                 this.showThirdPlace = false;
+                this.revealTimers.forEach(t => clearTimeout(t));
+                this.revealTimers = [];
+                this.confetti = [];
+                this.resultsHeadline = "";
                 this.time = 0;
                 this.place = 0;
                 this.stop = 0;
@@ -165,7 +172,6 @@ const app = Vue.createApp({
                 if (this.winners.length == this.players.length) {
                     console.log("All Players Finished");
                     this.presentWinners();
-                    this.calculateWinners();
                 }
             }
             if ( m['action'] == 'updateWinnersPage') {
@@ -407,77 +413,89 @@ const app = Vue.createApp({
             return Math.round(wpm);
         },
         presentWinners() {
-            let place = 0;
-            console.log("WINNERS.LENGTH: ", this.winners.length)
-            console.log("PRESENTING WINNNNNNNERSSSSS Winners");
-            console.log("Winners: ", this.winners);
+            // Reveal 3rd, then 2nd, then 1st (with confetti), then show "Play again"
             this.gameBoard = 'winners';
+            this.revealTimers.forEach(t => clearTimeout(t));
+            this.revealTimers = [];
             if (this.winners.length == 0) {
-                console.log("No winners to present");
                 return;
             }
-            if (this.winners.length == 1) {
-                this.winners[1] = {
-                    name: "No one",
-                    color: "black",
-                    place: 2,
-                    time: 0,
-                    accuracy: 0,
-                    wpm: 0,
-                }
-                this.players[1] = {
-                    name: "No one",
-                    color: "black",
-                    place: 2,
-                    time: 0,
-                    accuracy: 0,
-                    wpm: 0,
-                }
+            const steps = [];
+            if (this.winners[2]) {
+                steps.push(() => { this.resultsHeadline = "In third place…"; });
+                steps.push(() => { this.showThirdPlace = true; });
             }
-            if (this.winners.length == 2) {
-                this.winners[2] = {
-                    name: "No one",
-                    color: "black",
-                    place: 3,
-                    time: 0,
-                    accuracy: 0,
-                    wpm: 0,
-                }
-                this.players[2] = {
-                    name: "No one",
-                    color: "black",
-                    place: 3,
-                    time: 0,
-                    accuracy: 0,
-                    wpm: 0,
-                }
+            if (this.winners[1]) {
+                steps.push(() => { this.resultsHeadline = "In second place…"; });
+                steps.push(() => { this.showSecondPlace = true; });
             }
-            console.log("SD:LKFJ:SDLKFJ:SDLKFJ:", this.winners)
-            this.placeTimer = setInterval(() => {
-                place++;
-                this.gameBoard = 'winners';
-                if (place == 2) {
-                    this.showFirstPlace = true;
-                    console.log("First Place: ", this.winners[0]);
-                } else if (place == 3) {
-                    this.showSecondPlace = true;
-                } else if (place == 4) {
-                    this.showThirdPlace = true;
-                    this.winSound.play();
-                } else if (place == 5) {
-                    clearInterval(this.placeTimer);
-                    this.gameBoard = 'playAgain';
-                }
-                console.log("GAMMMME BOARDDD: ", this.gameBoard)
-              }, 2000);
-            
-            console.log("Winners: ", this.winners);
+            steps.push(() => { this.resultsHeadline = "And the winner is…"; });
+            steps.push(() => {
+                this.showFirstPlace = true;
+                this.resultsHeadline = this.winners[0].name + " wins!";
+                this.confetti = this.makeConfetti();
+                const played = this.winSound.play();
+                if (played && played.catch) played.catch(() => {});
+            });
+            steps.push(() => { this.gameBoard = 'playAgain'; });
+
+            let delay = 0;
+            steps.forEach((step, i) => {
+                this.revealTimers.push(setTimeout(step, delay));
+                delay += (i == steps.length - 2) ? 3000 : 1600;
+            });
+        },
+        makeConfetti() {
+            const colors = ['#ffe27a', '#ff7a59', '#4fd1c5', '#ffffff', '#9ae6b4', '#f687b3', '#7cc4ff'];
+            const pieces = [];
+            for (let i = 0; i < 110; i++) {
+                const w = 7 + Math.random() * 8;
+                pieces.push({
+                    left: (Math.random() * 100) + '%',
+                    width: w + 'px',
+                    height: (w * (0.4 + Math.random() * 0.5)) + 'px',
+                    backgroundColor: colors[i % colors.length],
+                    animationDelay: (Math.random() * 0.9) + 's',
+                    animationDuration: (2.6 + Math.random() * 2.2) + 's',
+                    '--spin': (Math.random() > 0.5 ? '' : '-') + (360 + Math.floor(Math.random() * 540)) + 'deg',
+                });
+            }
+            return pieces;
+        },
+        bubbleStyle(n) {
+            const size = 8 + (n * 7) % 22;
+            return {
+                left: ((n * 37) % 100) + '%',
+                width: size + 'px',
+                height: size + 'px',
+                animationDuration: (9 + (n * 3) % 9) + 's',
+                animationDelay: (-(n * 1.7)) + 's',
+            };
+        },
+        ordinal(n) {
+            const s = ['th', 'st', 'nd', 'rd'];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
         },
         playAgain: function () {
             let toSend = {
                 action: 'playAgain',
             }
             this.sendToSocket(toSend);
+        },
+    },
+    computed: {
+        // Podium order on screen: 2nd, 1st, 3rd
+        podiumSpots() {
+            return [
+                { place: 2, label: '2nd', player: this.winners[1] || null, revealed: this.showSecondPlace },
+                { place: 1, label: '1st', player: this.winners[0] || null, revealed: this.showFirstPlace },
+                { place: 3, label: '3rd', player: this.winners[2] || null, revealed: this.showThirdPlace },
+            ];
+        },
+        // Everyone who finished after 3rd place
+        otherFinishers() {
+            return this.winners.slice(3);
         },
     },
     watch: {
