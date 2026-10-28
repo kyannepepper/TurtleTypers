@@ -10,6 +10,12 @@ const app = Vue.createApp({
             socket: null,
             messageToSend: "",
             sendName: "",
+            // Kahoot-style game code
+            isHost: !window.location.pathname.includes('player') && !window.location.pathname.includes('join'),
+            gameCode: "",
+            joinCode: new URLSearchParams(window.location.search).get('code') || "",
+            joinError: "",
+            joinUrl: window.location.host + "/join",
             players: [],
             gameBoard: 'joining',
             countdown: 3,
@@ -41,6 +47,12 @@ const app = Vue.createApp({
         connectSocket: function () {
             this.socket = new WebSocket("wss://s25-websocket-kyannepepper.onrender.com")
             //this.socket = new WebSocket("ws://localhost:3000")
+            this.socket.addEventListener("open", () => {
+                // The host screen asks the server for a new game code
+                if (this.isHost) {
+                    this.sendToSocket({ action: 'createGame' });
+                }
+            })
             this.socket.addEventListener("message", message => {
                 this.socketReceive(message);
             })
@@ -50,6 +62,18 @@ const app = Vue.createApp({
             console.log("message recieved: ", m); 
             console.log("Action: ", m['action']);
             console.log("GameBoard: ", this.gameBoard);
+            if ( m['action'] == 'gameCreated') {
+                this.gameCode = m['code'];
+            }
+            if ( m['action'] == 'joinError') {
+                this.joinError = m['message'];
+            }
+            if ( m['action'] == 'hostLeft') {
+                this.gameBoard = 'joining';
+                this.players = [];
+                this.winners = [];
+                this.joinError = "The host ended the game. Enter a new code to join again.";
+            }
             if ( m['action'] == 'playAgain') {
                 this.gameBoard = 'joining';
                 console.log("Game Board: ", this.gameBoard);
@@ -165,6 +189,16 @@ const app = Vue.createApp({
             this.socket.send(JSON.stringify(data));
         },
         joinGame: function () {
+            this.joinError = "";
+            this.joinCode = String(this.joinCode).replace(/\D/g, '');
+            if (this.joinCode.length != 6) {
+                this.joinError = "Enter the 6-digit game code from the big screen.";
+                return;
+            }
+            if (this.sendName.trim() == "") {
+                this.joinError = "Enter your name.";
+                return;
+            }
             if (this.gameBoard == 'joining') {
                 function getRandomHslColor(minSaturation = 0, maxSaturation = 100, minLightness = 0, maxLightness = 100) {
                     const h = Math.floor(Math.random() * 361); // Hue (0-360)
@@ -178,7 +212,8 @@ const app = Vue.createApp({
                 const randomColorHsl = getRandomHslColor();
                 let toSend = {
                     action: 'joinGame',
-                    name: this.sendName,
+                    code: this.joinCode,
+                    name: this.sendName.trim(),
                     color: randomColorHsl,
                     accuracy: 0,
                 }

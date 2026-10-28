@@ -6,7 +6,25 @@
       <div v-if="gameBoard == 'joining'" id="wrapper">
         <h1 id="welcomeTitle">Turtle Typers</h1>
         <img id="turtle" src="turtle_white_transparent.png" class="turtle" />
-        <input id="inputName" type="text" v-model="sendName" />
+        <input
+          id="inputCode"
+          class="joinInput"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          maxlength="7"
+          placeholder="Game PIN"
+          v-model="joinCode"
+        />
+        <input
+          id="inputName"
+          class="joinInput"
+          type="text"
+          placeholder="Your name"
+          v-model="sendName"
+          @keyup.enter="joinGame"
+        />
+        <p v-if="joinError" id="joinError">{{ joinError }}</p>
         <button id="joinGameButton" @click="joinGame">JOIN</button>
       </div>
       <div v-else-if="gameBoard == 'youJoined'" id="wrapper" class="player">
@@ -76,7 +94,30 @@
 </html>
 
 <style scoped>
-  #inputName {
+  #inputCode {
+    text-align: center;
+    letter-spacing: 6px;
+    font-weight: bold;
+    margin-bottom: 16px;
+  }
+  #inputCode::placeholder {
+    letter-spacing: 0;
+    font-weight: normal;
+  }
+  #joinError {
+    color: #ffffff;
+    background-color: #c62828;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 22px;
+    font-family: sans-serif;
+    width: 80%;
+    max-width: 464px;
+    box-sizing: border-box;
+    text-align: center;
+    margin: 16px 0 0;
+  }
+  .joinInput {
     position: relative;
     width: 80%;
     max-width: 480px;
@@ -87,7 +128,7 @@
     border: none;
     box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
   }
-  #inputName:focus-visible {
+  .joinInput:focus-visible {
     outline: none;
   }
   .wrapper {

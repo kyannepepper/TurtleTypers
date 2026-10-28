@@ -5,7 +5,17 @@
     <div id="app">
       <div id="joiningGame" v-if="gameBoard == 'joining'">
         <h1 id="welcomeTitle">Turtle Typers</h1>
-        <img id="qr" src="Turtle_Typers_QR.png" />
+        <div id="joinPanel">
+          <div class="joinStep">
+            <span class="joinLabel">Join at</span>
+            <span class="joinUrl">{{ joinUrl }}</span>
+          </div>
+          <div class="joinStep">
+            <span class="joinLabel">Game PIN</span>
+            <span class="gamePin" v-if="gameCode">{{ gameCode.slice(0, 3) }} {{ gameCode.slice(3) }}</span>
+            <span class="gamePin loading" v-else>Loading…</span>
+          </div>
+        </div>
         <div id="allPlayers">
           <div v-for="player in players" class="player">
             <div
@@ -346,11 +356,50 @@
     animation: pop 0.6s ease;
   }
 
-  #qr {
-    width: 140px;
-    height: 140px;
+  #joinPanel {
+    display: flex;
+    align-items: stretch;
+    background-color: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    margin-top: -40px;
     margin-bottom: 20px;
-    animation: float 3s ease-in-out infinite;
+    animation: pop 0.6s ease;
+  }
+  .joinStep {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 20px 40px;
+  }
+  .joinStep + .joinStep {
+    border-left: 3px solid #e0eeec;
+  }
+  .joinLabel {
+    font-size: 20px;
+    font-weight: bold;
+    color: #00796b;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .joinUrl {
+    font-size: 32px;
+    font-weight: bold;
+    color: #333;
+  }
+  .gamePin {
+    font-size: 72px;
+    font-weight: 800;
+    color: #263238;
+    letter-spacing: 6px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .gamePin.loading {
+    font-size: 36px;
+    letter-spacing: 0;
+    color: #999;
   }
 
   #allPlayers {
@@ -553,9 +602,15 @@
 
   /* Responsive Tuning */
   @media screen and (max-width: 768px) {
-    #qr {
-      width: 100px;
-      height: 100px;
+    #joinPanel {
+      flex-direction: column;
+    }
+    .joinStep + .joinStep {
+      border-left: none;
+      border-top: 3px solid #e0eeec;
+    }
+    .gamePin {
+      font-size: 48px;
     }
 
     .startButton {

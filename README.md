@@ -14,8 +14,10 @@ Player join screen (teal lobby, **Turtle Typers** title, scan-to-join QR, and na
 
 ## How it works
 
-- **Display (host):** open [`http://localhost:3000/`](http://localhost:3000/) — lobby, live race board, and podium for 1st–3rd place.
-- **Players:** open [`http://localhost:3000/player.html`](http://localhost:3000/player.html) on each device, enter a name, and join. The host starts the round from the display after everyone is in.
+- **Display (host):** open [`http://localhost:3000/`](http://localhost:3000/) — lobby, live race board, and podium for 1st–3rd place. The lobby shows a 6-digit **game PIN** (like Kahoot).
+- **Players:** open [`http://localhost:3000/join`](http://localhost:3000/join) on each device, type the game PIN and a name, and join. The host starts the round from the display after everyone is in.
+
+Each host screen gets its own game PIN, so several games can run at once without mixing players.
 
 The server in `index.js` serves static files from `public/` and runs a WebSocket server on the same HTTP port so all clients stay in sync.
 

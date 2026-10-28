@@ -3,5 +3,6 @@
   "framework": null,
   "installCommand": "",
   "buildCommand": "",
-  "outputDirectory": "public"
+  "outputDirectory": "public",
+  "rewrites": [{ "source": "/join", "destination": "/player.html" }]
 }

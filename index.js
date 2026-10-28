@@ -7,124 +7,172 @@ app.use(express.static(path.join(__dirname, 'public')));
 // any Express middlewares go here
 
 // any API REST routers go here
+app.get('/join', function (req, res) {
+    res.sendFile(path.join(__dirname, 'public', 'player.html'));
+});
 
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, function () {
     console.log("Server is ready...");
 });
 
-//const wss = new WebSocket.WebSocketServer({ port: 8080 });
 const wss = new WebSocket.WebSocketServer({ server: server });
 
-let players = [];
-let place = 1;
+// Every host screen gets its own game, keyed by a 6-digit code (like Kahoot).
+// games[code] = { host: ws, players: [], place: 1, started: false }
+const games = {};
 
+function makeGameCode() {
+    let code;
+    do {
+        code = String(Math.floor(100000 + Math.random() * 900000));
+    } while (games[code]);
+    return code;
+}
+
+// Send a message to everyone (host + players) in one game.
+function sendToGame(code, data) {
+    const text = typeof data === 'string' ? data : JSON.stringify(data);
+    wss.clients.forEach(function (client) {
+        if (client.gameCode === code && client.readyState === WebSocket.OPEN) {
+            client.send(text);
+        }
+    });
+}
+
+// Players without the socket object, so they can be sent as JSON.
+function publicPlayers(game) {
+    return game.players.map(function (p) {
+        return { name: p.name, color: p.color, accuracy: p.accuracy, percentage: p.percentage };
+    });
+}
 
 wss.on('connection', function (ws) {
-    console.log("Cleint connected!")
-    // ws is the client that has connected
+    console.log("Client connected!")
     ws.on('error', function (err) {
         console.error("Error with socket:", err);
     });
 
-    // send a welcome message when a client connects
     ws.on('close', () => {
         console.log('Client disconnected');
-        console.log(players.find(player => player.socket === ws));
-        // Remove the player from the players array
-        const playerIndex = players.findIndex(player => player.socket === ws);
-        if (playerIndex !== -1) {
-            players.splice(playerIndex, 1);
+        const code = ws.gameCode;
+        const game = games[code];
+        if (!game) return;
+
+        if (ws.isHost) {
+            // The host screen closed, so the game is over for everyone in it.
+            sendToGame(code, { action: 'hostLeft' });
+            wss.clients.forEach(function (client) {
+                if (client.gameCode === code) client.gameCode = null;
+            });
+            delete games[code];
+            console.log('Game ' + code + ' ended (host left)');
+            return;
         }
-        // players = players.filter(player => player.ws !== ws);
-        console.log('A player disconnected. Updated players:', players.map(p => p.name));
+
+        const playerIndex = game.players.findIndex(player => player.socket === ws);
+        if (playerIndex !== -1) {
+            game.players.splice(playerIndex, 1);
+            sendToGame(code, { action: 'updateAllPlayers', players: publicPlayers(game) });
+        }
+        console.log('A player left game ' + code + '. Players:', game.players.map(p => p.name));
     });
 
     ws.on('message', function (data) {
-        console.log("Recieved message from client!")
-        message = JSON.parse(data);
-        if (message.action == 'j') {
-            players.push({
-                name: message.name,
-                team: message.teamColor,
-                socket: ws,
-            }) 
+        let message;
+        try {
+            message = JSON.parse(data);
+        } catch (e) {
+            return;
         }
+
+        // Host screen asks for a new game code.
+        if (message.action == 'createGame') {
+            const code = makeGameCode();
+            games[code] = { host: ws, players: [], place: 1, started: false };
+            ws.gameCode = code;
+            ws.isHost = true;
+            ws.send(JSON.stringify({ action: 'gameCreated', code: code }));
+            console.log('Game ' + code + ' created');
+            return;
+        }
+
         if (message.action == 'joinGame') {
-            console.log(players.length);
-            place = 1;
-            newPlayer = {
+            const code = String(message.code || '').replace(/\D/g, '');
+            const game = games[code];
+            if (!game) {
+                ws.send(JSON.stringify({ action: 'joinError', message: "We couldn't find a game with that code." }));
+                return;
+            }
+            if (game.started) {
+                ws.send(JSON.stringify({ action: 'joinError', message: 'That game has already started. Wait for the next round!' }));
+                return;
+            }
+            ws.gameCode = code;
+            game.place = 1;
+            const newPlayer = {
                 name: message.name,
                 color: message.color,
                 accuracy: message.accuracy,
                 percentage: message.percentage,
                 socket: ws,
             }
-            players.push(newPlayer) 
-            newPlayer.socket.send(JSON.stringify({
+            game.players.push(newPlayer)
+            ws.send(JSON.stringify({
                 action: 'updatePlayersPage',
                 name: message.name,
                 color: message.color,
             }))
-            wss.clients.forEach(function (client) {
-                client.send(JSON.stringify({
-                    action: 'updateAllPlayers',
-                    players: players,
-                }));
-            });
+            sendToGame(code, { action: 'updateAllPlayers', players: publicPlayers(game) });
+        }
+
+        // Everything below only applies to someone who is in a game.
+        const code = ws.gameCode;
+        const game = games[code];
+        if (!game) return;
+
+        if (message.action == 'startGame') {
+            game.started = true;
         }
         if (message.action == 'sendPercentage') {
-            const existingPlayer = players.find(player => player.socket === ws);
+            const existingPlayer = game.players.find(player => player.socket === ws);
+            if (!existingPlayer) return;
             existingPlayer.percentage = message.percentage;
             existingPlayer.accuracy = message.accuracy;
-            console.log(existingPlayer.percentage);
-            console.log(existingPlayer.percentage);
-            wss.clients.forEach(function (client) {
-                client.send(JSON.stringify({
-                    action: 'updateBoard',
-                    color: existingPlayer.color,
-                    percentage: existingPlayer.percentage,
-                }));
+            sendToGame(code, {
+                action: 'updateBoard',
+                color: existingPlayer.color,
+                percentage: existingPlayer.percentage,
             });
         }
         if (message.action == 'finished') {
-            const existingPlayer = players.find(player => player.socket === ws);
+            const existingPlayer = game.players.find(player => player.socket === ws);
+            if (!existingPlayer) return;
             existingPlayer.percentage = message.percentage;
-            console.log(existingPlayer.percentage);
-            wss.clients.forEach(function (client) {
-                client.send(JSON.stringify({
-                    action: 'updateWinners',
-                    name: existingPlayer.name,
-                    color: existingPlayer.color,
-                    place: place,
-                    time: message.time,
-                    accuracy: message.accuracy,
-                    wpm: message.wpm,
-                }));
+            sendToGame(code, {
+                action: 'updateWinners',
+                name: existingPlayer.name,
+                color: existingPlayer.color,
+                place: game.place,
+                time: message.time,
+                accuracy: message.accuracy,
+                wpm: message.wpm,
             });
-            existingPlayer.socket.send(JSON.stringify({
+            ws.send(JSON.stringify({
                 action: 'updateWinnersPage',
                 time: message.time,
                 accuracy: existingPlayer.accuracy,
                 wpm: message.wpm,
             }))
-            place += 1;
+            game.place += 1;
         }
-        if(message.action == 'playAgain') {
-            players = [];
-            place = 1;
+        if (message.action == 'playAgain') {
+            game.players = [];
+            game.place = 1;
+            game.started = false;
         }
 
-        wss.clients.forEach(function (client) {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(data, { binary: false } );
-        }
-        });
-  });
+        // Pass the original message along to everyone in the same game.
+        sendToGame(code, data.toString());
+    });
 });
-
-
-// ws.send(JSON.stringify(newPlayer)) ;
-// wss.clients.forEach(function (client) {
-//     client.send( JSON.stringify(newPlayer) );
-// });
