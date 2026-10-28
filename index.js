@@ -1,13 +1,15 @@
 const express = require('express')
 const WebSocket = require('ws');
+const path = require('path');
 
 const app = express();
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 // any Express middlewares go here
 
 // any API REST routers go here
 
-const server = app.listen(3000, function () {
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, function () {
     console.log("Server is ready...");
 });
 
