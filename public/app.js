@@ -12,6 +12,7 @@ const app = Vue.createApp({
             sendName: "",
             // Kahoot-style game code
             isHost: !window.location.pathname.includes('player') && !window.location.pathname.includes('join'),
+            // The host makes its own 6-digit PIN as soon as the page loads
             gameCode: "",
             joinCode: new URLSearchParams(window.location.search).get('code') || "",
             joinError: "",
@@ -50,9 +51,16 @@ const app = Vue.createApp({
             this.socket = new WebSocket("wss://s25-websocket-kyannepepper.onrender.com")
             //this.socket = new WebSocket("ws://localhost:3000")
             this.socket.addEventListener("open", () => {
-                // The host screen asks the server for a new game code
+                // The host screen registers its game PIN with the server
                 if (this.isHost) {
-                    this.sendToSocket({ action: 'createGame' });
+                    this.sendToSocket({ action: 'createGame', code: this.gameCode });
+                }
+            })
+            this.socket.addEventListener("close", () => {
+                // If the host loses its connection (for example the server
+                // restarted), reconnect and register the same PIN again
+                if (this.isHost) {
+                    setTimeout(() => this.connectSocket(), 2000);
                 }
             })
             this.socket.addEventListener("message", message => {
@@ -485,7 +493,9 @@ const app = Vue.createApp({
         }
     },
     created: function () {
-        
+        if (this.isHost) {
+            this.gameCode = String(Math.floor(100000 + Math.random() * 900000));
+        }
         this.connectSocket();
     },
     mounted: function () {

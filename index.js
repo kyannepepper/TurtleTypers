@@ -86,9 +86,13 @@ wss.on('connection', function (ws) {
             return;
         }
 
-        // Host screen asks for a new game code.
+        // Host screen registers its game PIN. The host picks the PIN itself;
+        // if it's already taken (or missing) the server picks a new one.
         if (message.action == 'createGame') {
-            const code = makeGameCode();
+            let code = String(message.code || '');
+            if (!/^\d{6}$/.test(code) || games[code]) {
+                code = makeGameCode();
+            }
             games[code] = { host: ws, players: [], place: 1, started: false };
             ws.gameCode = code;
             ws.isHost = true;
